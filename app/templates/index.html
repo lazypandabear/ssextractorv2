@@ -26,7 +26,7 @@
         </li>
       </ul>
     </div>
-    <form method="POST" enctype="multipart/form-data">
+    <form method="POST" enctype="multipart/form-data" id="migration-form">
       <div class="mb-3">
         <label for="smartsheet_api_key" class="form-label">Smartsheet API Key:</label>
         <input type="text" class="form-control" id="smartsheet_api_key" name="smartsheet_api_key" required>
@@ -57,7 +57,7 @@
         </div>
       </div>
 
-      <button type="submit" class="btn btn-primary">Start Migration</button>
+      <button type="submit" class="btn btn-primary" id="start-migration-button">Start Migration</button>
     </form>
     <hr>
     <div>
@@ -75,6 +75,8 @@
     const oauthFields = document.getElementById('oauth-fields');
     const googleSigninButton = document.getElementById('google-signin-button');
     const googleSigninAlert = document.getElementById('google-signin-alert');
+    const migrationForm = document.getElementById('migration-form');
+    const startMigrationButton = document.getElementById('start-migration-button');
 
     function toggleAuthFields() {
       const useOAuth = authSelect.value === 'oauth';
@@ -94,6 +96,12 @@
     authSelect.addEventListener('change', toggleAuthFields);
     // Initialize on page load
     toggleAuthFields();
+
+    migrationForm.addEventListener('submit', () => {
+      // Prevent double-submit by disabling the button immediately.
+      startMigrationButton.disabled = true;
+      startMigrationButton.textContent = 'Starting...';
+    });
   </script>
 </body>
 </html>

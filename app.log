@@ -232,3 +232,10 @@
 2026-01-28 07:49:08,964 INFO Migration request rejected; migration already running.
 2026-01-28 07:57:16,357 INFO Processing sheet 1614719866589060.
 2026-01-28 08:22:09,188 INFO Processing sheet 1614719866589060.
+2026-01-29 08:33:50,090 INFO Starting production server on port 5000...
+2026-01-29 08:34:44,614 INFO Received migration request.
+2026-01-29 08:34:59,360 INFO Starting migration thread.
+2026-01-29 08:34:59,361 INFO Migration started.
+2026-01-29 08:35:01,380 INFO Found 6 sheets in folder 3789904250464132.
+2026-01-29 08:35:01,380 INFO Processing sheet 4135490992164740.
+2026-01-29 08:35:37,389 INFO Processing sheet 1665643741925252.
