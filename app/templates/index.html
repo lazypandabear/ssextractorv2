@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Integration Setup</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container my-5">
+    <h1 class="mb-4">Smartsheet to Google Drive Migration Setup</h1>
+    <h4>by: Dennis A. Garcia</h4>
+    <p class="mb-3">Please provide the following details. Follow the instructions below each field to get your API keys and folder IDs:</p>
+    {% if error_message %}
+      <div class="alert alert-danger">{{ error_message }}</div>
+    {% endif %}
+    <div class="alert alert-info">
+      <ul>
+        <li>
+          <strong>Smartsheet API Key:</strong> Log in to your Smartsheet account, go to Account &gt; Personal Settings &gt; API Access, and generate an API key.
+        </li>
+        <li>
+          <strong>Smartsheet Folder ID:</strong> Open your Smartsheet folder; the folder ID is part of the URL.
+        </li>
+        <li>
+          <strong>Google Drive Parent Folder ID:</strong> Use a Shared Drive folder ID; the app will create Sheets/Comments/Attachments subfolders.
+        </li>
+      </ul>
+    </div>
+    <form method="POST" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label for="smartsheet_api_key" class="form-label">Smartsheet API Key:</label>
+        <input type="text" class="form-control" id="smartsheet_api_key" name="smartsheet_api_key" required>
+      </div>
+      <div class="mb-3">
+        <label for="smartsheet_folder_id" class="form-label">Smartsheet Folder ID:</label>
+        <input type="text" class="form-control" id="smartsheet_folder_id" name="smartsheet_folder_id" required>
+      </div>
+      <div class="mb-3">
+        <label for="google_drive_parent_folder_id" class="form-label">Google Drive Parent Folder ID:</label>
+        <input type="text" class="form-control" id="google_drive_parent_folder_id" name="google_drive_parent_folder_id" required>
+        <div class="form-text">Share this parent folder with <strong>smartsheet-data-archiving@jira-onboarding.iam.gserviceaccount.com</strong> so the app can upload files and create subfolders.</div>
+      </div>
+      <div class="mb-3">
+        <label for="google_auth_type" class="form-label">Google Auth Method:</label>
+        <select class="form-select" id="google_auth_type" name="google_auth_type">
+          <option value="service_account" selected>Service account (default)</option>
+          <option value="oauth">OAuth (Google login)</option>
+        </select>
+        <div class="form-text">Default is service account. OAuth Google login is coming soon.</div>
+      </div>
+
+      <div id="oauth-fields" class="d-none">
+        <button type="button" class="btn btn-outline-secondary" id="google-signin-button">Sign in with Google</button>
+        <div class="form-text mt-2">For future development: this will launch the Google login flow.</div>
+        <div id="google-signin-alert" class="alert alert-warning d-none mt-2" role="alert">
+          Google Sign-In coming soon.
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Start Migration</button>
+    </form>
+    <hr>
+    <div>
+      <h2>Service Account Setup</h2>
+      <p>The app uses <code>SmartSheetDataArchive.json</code> from the project root. Make sure the Google Drive parent folder is shared with the service account below:</p>
+      <ol>
+        <li>Share the parent folder with <strong>smartsheet-data-archiving@jira-onboarding.iam.gserviceaccount.com</strong>.</li>
+        <li>Confirm the service account has Editor access so it can create folders and upload files.</li>
+      </ol>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    const authSelect = document.getElementById('google_auth_type');
+    const oauthFields = document.getElementById('oauth-fields');
+    const googleSigninButton = document.getElementById('google-signin-button');
+    const googleSigninAlert = document.getElementById('google-signin-alert');
+
+    function toggleAuthFields() {
+      const useOAuth = authSelect.value === 'oauth';
+      if (useOAuth) {
+        oauthFields.classList.remove('d-none');
+      } else {
+        oauthFields.classList.add('d-none');
+        // Reset inline alert when switching back to service account
+        googleSigninAlert.classList.add('d-none');
+      }
+    }
+
+    googleSigninButton.addEventListener('click', () => {
+      googleSigninAlert.classList.remove('d-none');
+    });
+
+    authSelect.addEventListener('change', toggleAuthFields);
+    // Initialize on page load
+    toggleAuthFields();
+  </script>
+</body>
+</html>
