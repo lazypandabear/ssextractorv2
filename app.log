@@ -239,3 +239,363 @@
 2026-01-29 08:35:01,380 INFO Found 6 sheets in folder 3789904250464132.
 2026-01-29 08:35:01,380 INFO Processing sheet 4135490992164740.
 2026-01-29 08:35:37,389 INFO Processing sheet 1665643741925252.
+2026-01-29 08:36:01,234 INFO Processing sheet 4903323233636228.
+2026-01-29 08:36:26,802 INFO Processing sheet 5096841575092100.
+2026-01-29 08:36:44,680 INFO Processing sheet 5324990237855620.
+2026-01-29 08:37:00,701 INFO Processing sheet 3072468869664644.
+2026-02-02 01:17:02,225 INFO Received migration request.
+2026-02-02 01:17:14,008 INFO Starting migration thread.
+2026-02-02 01:17:14,009 INFO Migration started.
+2026-02-02 01:17:15,757 INFO Found 5 sheets in folder 3602911944042372.
+2026-02-02 01:17:15,758 INFO Processing sheet 116767493934980.
+2026-02-02 04:04:31,356 INFO Processing sheet 1614719866589060.
+2026-02-02 05:32:10,763 INFO Processing sheet 6624742795595652.
+2026-02-02 06:20:10,320 INFO Processing sheet 8945589199785860.
+2026-02-02 07:58:17,587 INFO Processing sheet 8065281997885316.
+2026-02-02 08:30:54,826 INFO Received migration request.
+2026-02-02 08:31:01,756 INFO Starting migration thread.
+2026-02-02 08:31:01,757 INFO Migration started.
+2026-02-02 08:32:13,874 INFO Received migration request.
+2026-02-02 08:32:16,685 INFO Starting migration thread.
+2026-02-02 08:32:16,685 INFO Migration started.
+2026-02-02 08:34:26,317 INFO Received migration request.
+2026-02-02 08:34:34,096 INFO Starting migration thread.
+2026-02-02 08:34:34,097 INFO Migration started.
+2026-02-02 08:35:28,284 INFO Received migration request.
+2026-02-02 08:35:31,024 INFO Starting migration thread.
+2026-02-02 08:35:31,025 INFO Migration started.
+2026-02-02 08:37:00,572 INFO Received migration request.
+2026-02-02 08:37:03,358 INFO Starting migration thread.
+2026-02-02 08:37:03,358 INFO Migration started.
+2026-02-02 08:37:04,474 INFO Found 1 sheets in folder 5116185688729476.
+2026-02-02 08:37:04,475 INFO Processing sheet 5263096150970244.
+2026-02-02 08:37:09,400 ERROR Migration failed with an unhandled exception.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/jKjKzm/sheets/5263096150970244'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/ssextractor.py", line 525, in upload_to_google_drive
+    sheet_folder = sheet_folder_path(sheet_id)
+  File "/app/app/ssextractor.py", line 161, in sheet_folder_path
+    return ensure_resource_subdir(get_resource_root() / "sheets", sheet_id)
+  File "/app/app/ssextractor.py", line 157, in ensure_resource_subdir
+    folder.mkdir(parents=True, exist_ok=True)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1184, in mkdir
+    if not exist_ok or not self.is_dir():
+  File "/usr/local/lib/python3.10/pathlib.py", line 1305, in is_dir
+    return S_ISDIR(self.stat().st_mode)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1097, in stat
+    return self._accessor.stat(self, follow_symlinks=follow_symlinks)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/jKjKzm/sheets/5263096150970244'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/main.py", line 89, in run_migration
+    upload_to_google_drive(sheet_id)
+  File "/app/app/ssextractor.py", line 567, in upload_to_google_drive
+    print(f"Error uploading {file_path} to Google Drive: {e}")
+UnboundLocalError: local variable 'file_path' referenced before assignment
+2026-02-03 03:25:54,075 INFO Received migration request.
+2026-02-03 03:25:55,241 INFO Failed to initialize Drive subfolders under parent https://drive.google.com/drive/folders/1iNwlRYQNMx8qrAmHaVqREzMQEuEsmIOw: <HttpError 404 when requesting https://www.googleapis.com/drive/v3/files?q=name%3D%27sheets%27+and+%27https%3A%2F%2Fdrive.google.com%2Fdrive%2Ffolders%2F1iNwlRYQNMx8qrAmHaVqREzMQEuEsmIOw%27+in+parents+and+mimeType%3D%27application%2Fvnd.google-apps.folder%27&fields=files%28id%29&includeItemsFromAllDrives=true&supportsAllDrives=true&alt=json returned "File not found: .". Details: "[{'message': 'File not found: .', 'domain': 'global', 'reason': 'notFound', 'location': 'fileId', 'locationType': 'parameter'}]">
+2026-02-03 03:27:59,479 INFO Received migration request.
+2026-02-03 03:28:00,097 INFO Failed to initialize Drive subfolders under parent https://drive.google.com/drive/folders/1iNwlRYQNMx8qrAmHaVqREzMQEuEsmIOw?usp=sharing: <HttpError 404 when requesting https://www.googleapis.com/drive/v3/files?q=name%3D%27sheets%27+and+%27https%3A%2F%2Fdrive.google.com%2Fdrive%2Ffolders%2F1iNwlRYQNMx8qrAmHaVqREzMQEuEsmIOw%3Fusp%3Dsharing%27+in+parents+and+mimeType%3D%27application%2Fvnd.google-apps.folder%27&fields=files%28id%29&includeItemsFromAllDrives=true&supportsAllDrives=true&alt=json returned "File not found: .". Details: "[{'message': 'File not found: .', 'domain': 'global', 'reason': 'notFound', 'location': 'fileId', 'locationType': 'parameter'}]">
+2026-02-03 03:30:09,268 INFO Received migration request.
+2026-02-03 03:30:15,773 INFO Starting migration thread.
+2026-02-03 03:30:15,774 INFO Migration started.
+2026-02-03 04:01:00,207 INFO Received migration request.
+2026-02-03 04:01:02,253 INFO Starting migration thread.
+2026-02-03 04:01:02,253 INFO Migration started.
+2026-02-03 04:02:02,405 INFO Received migration request.
+2026-02-03 04:02:07,742 INFO Starting migration thread.
+2026-02-03 04:02:07,742 INFO Migration started.
+2026-02-03 04:02:09,406 INFO Found 1 sheets in folder 8793551854167940.
+2026-02-03 04:02:09,406 INFO Processing sheet 1190013765111684.
+2026-02-03 04:02:21,423 ERROR Migration failed with an unhandled exception.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/hsrTsj/sheets/1190013765111684'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/ssextractor.py", line 525, in upload_to_google_drive
+    sheet_folder = sheet_folder_path(sheet_id)
+  File "/app/app/ssextractor.py", line 161, in sheet_folder_path
+    return ensure_resource_subdir(get_resource_root() / "sheets", sheet_id)
+  File "/app/app/ssextractor.py", line 157, in ensure_resource_subdir
+    folder.mkdir(parents=True, exist_ok=True)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1184, in mkdir
+    if not exist_ok or not self.is_dir():
+  File "/usr/local/lib/python3.10/pathlib.py", line 1305, in is_dir
+    return S_ISDIR(self.stat().st_mode)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1097, in stat
+    return self._accessor.stat(self, follow_symlinks=follow_symlinks)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/hsrTsj/sheets/1190013765111684'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/main.py", line 89, in run_migration
+    upload_to_google_drive(sheet_id)
+  File "/app/app/ssextractor.py", line 567, in upload_to_google_drive
+    print(f"Error uploading {file_path} to Google Drive: {e}")
+UnboundLocalError: local variable 'file_path' referenced before assignment
+2026-02-03 04:03:56,975 INFO Received migration request.
+2026-02-03 04:03:58,948 INFO Starting migration thread.
+2026-02-03 04:03:58,948 INFO Migration started.
+2026-02-03 04:05:43,591 INFO Received migration request.
+2026-02-03 04:05:49,350 INFO Starting migration thread.
+2026-02-03 04:05:49,351 INFO Migration started.
+2026-02-03 04:05:51,019 INFO Found 1 sheets in folder 8793551854167940.
+2026-02-03 04:05:51,020 INFO Processing sheet 1190013765111684.
+2026-02-03 04:06:01,652 ERROR Migration failed with an unhandled exception.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/hsrTsj/sheets/1190013765111684'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/ssextractor.py", line 525, in upload_to_google_drive
+    sheet_folder = sheet_folder_path(sheet_id)
+  File "/app/app/ssextractor.py", line 161, in sheet_folder_path
+    return ensure_resource_subdir(get_resource_root() / "sheets", sheet_id)
+  File "/app/app/ssextractor.py", line 157, in ensure_resource_subdir
+    folder.mkdir(parents=True, exist_ok=True)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1184, in mkdir
+    if not exist_ok or not self.is_dir():
+  File "/usr/local/lib/python3.10/pathlib.py", line 1305, in is_dir
+    return S_ISDIR(self.stat().st_mode)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1097, in stat
+    return self._accessor.stat(self, follow_symlinks=follow_symlinks)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/hsrTsj/sheets/1190013765111684'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/main.py", line 89, in run_migration
+    upload_to_google_drive(sheet_id)
+  File "/app/app/ssextractor.py", line 567, in upload_to_google_drive
+    print(f"Error uploading {file_path} to Google Drive: {e}")
+UnboundLocalError: local variable 'file_path' referenced before assignment
+2026-02-03 04:07:42,044 INFO Received migration request.
+2026-02-03 04:07:44,218 INFO Starting migration thread.
+2026-02-03 04:07:44,218 INFO Migration started.
+2026-02-03 04:10:07,372 INFO Received migration request.
+2026-02-03 04:10:08,506 INFO Received migration request.
+2026-02-03 04:10:11,009 INFO Starting migration thread.
+2026-02-03 04:10:11,010 INFO Migration started.
+2026-02-03 04:10:12,843 INFO Found 1 sheets in folder 5116185688729476.
+2026-02-03 04:10:12,843 INFO Processing sheet 5263096150970244.
+2026-02-03 04:10:15,719 INFO Starting migration thread.
+2026-02-03 04:10:15,719 INFO Migration started.
+2026-02-03 04:10:17,317 ERROR Migration failed with an unhandled exception.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/jKjKzm/sheets/5263096150970244'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/ssextractor.py", line 525, in upload_to_google_drive
+    sheet_folder = sheet_folder_path(sheet_id)
+  File "/app/app/ssextractor.py", line 161, in sheet_folder_path
+    return ensure_resource_subdir(get_resource_root() / "sheets", sheet_id)
+  File "/app/app/ssextractor.py", line 157, in ensure_resource_subdir
+    folder.mkdir(parents=True, exist_ok=True)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1184, in mkdir
+    if not exist_ok or not self.is_dir():
+  File "/usr/local/lib/python3.10/pathlib.py", line 1305, in is_dir
+    return S_ISDIR(self.stat().st_mode)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1097, in stat
+    return self._accessor.stat(self, follow_symlinks=follow_symlinks)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/jKjKzm/sheets/5263096150970244'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/main.py", line 89, in run_migration
+    upload_to_google_drive(sheet_id)
+  File "/app/app/ssextractor.py", line 567, in upload_to_google_drive
+    print(f"Error uploading {file_path} to Google Drive: {e}")
+UnboundLocalError: local variable 'file_path' referenced before assignment
+2026-02-03 04:10:17,382 INFO Found 1 sheets in folder 5116185688729476.
+2026-02-03 04:10:17,382 INFO Processing sheet 5263096150970244.
+2026-02-03 04:10:21,793 ERROR Migration failed with an unhandled exception.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/jKjKzm/sheets/5263096150970244'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/ssextractor.py", line 525, in upload_to_google_drive
+    sheet_folder = sheet_folder_path(sheet_id)
+  File "/app/app/ssextractor.py", line 161, in sheet_folder_path
+    return ensure_resource_subdir(get_resource_root() / "sheets", sheet_id)
+  File "/app/app/ssextractor.py", line 157, in ensure_resource_subdir
+    folder.mkdir(parents=True, exist_ok=True)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1184, in mkdir
+    if not exist_ok or not self.is_dir():
+  File "/usr/local/lib/python3.10/pathlib.py", line 1305, in is_dir
+    return S_ISDIR(self.stat().st_mode)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1097, in stat
+    return self._accessor.stat(self, follow_symlinks=follow_symlinks)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/jKjKzm/sheets/5263096150970244'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/main.py", line 89, in run_migration
+    upload_to_google_drive(sheet_id)
+  File "/app/app/ssextractor.py", line 567, in upload_to_google_drive
+    print(f"Error uploading {file_path} to Google Drive: {e}")
+UnboundLocalError: local variable 'file_path' referenced before assignment
+2026-02-03 04:11:16,753 INFO Received migration request.
+2026-02-03 04:11:21,591 INFO Starting migration thread.
+2026-02-03 04:11:21,591 INFO Migration started.
+2026-02-03 04:11:23,355 INFO Found 1 sheets in folder 3586264785020804.
+2026-02-03 04:11:23,355 INFO Processing sheet 3933054758244228.
+2026-02-03 04:11:38,591 INFO Received migration request.
+2026-02-03 04:11:38,612 INFO Migration request rejected; migration already running.
+2026-02-03 04:11:46,407 ERROR Migration failed with an unhandled exception.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/hsrTsj/sheets/3933054758244228'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/ssextractor.py", line 525, in upload_to_google_drive
+    sheet_folder = sheet_folder_path(sheet_id)
+  File "/app/app/ssextractor.py", line 161, in sheet_folder_path
+    return ensure_resource_subdir(get_resource_root() / "sheets", sheet_id)
+  File "/app/app/ssextractor.py", line 157, in ensure_resource_subdir
+    folder.mkdir(parents=True, exist_ok=True)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1184, in mkdir
+    if not exist_ok or not self.is_dir():
+  File "/usr/local/lib/python3.10/pathlib.py", line 1305, in is_dir
+    return S_ISDIR(self.stat().st_mode)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1097, in stat
+    return self._accessor.stat(self, follow_symlinks=follow_symlinks)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/hsrTsj/sheets/3933054758244228'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/main.py", line 89, in run_migration
+    upload_to_google_drive(sheet_id)
+  File "/app/app/ssextractor.py", line 567, in upload_to_google_drive
+    print(f"Error uploading {file_path} to Google Drive: {e}")
+UnboundLocalError: local variable 'file_path' referenced before assignment
+2026-02-03 04:12:11,699 INFO Received migration request.
+2026-02-03 04:12:18,670 INFO Starting migration thread.
+2026-02-03 04:12:18,671 INFO Migration started.
+2026-02-03 04:12:20,300 INFO Found 1 sheets in folder 3586264785020804.
+2026-02-03 04:12:20,300 INFO Processing sheet 3933054758244228.
+2026-02-03 04:12:43,125 ERROR Migration failed with an unhandled exception.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/hsrTsj/sheets/3933054758244228'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/ssextractor.py", line 525, in upload_to_google_drive
+    sheet_folder = sheet_folder_path(sheet_id)
+  File "/app/app/ssextractor.py", line 161, in sheet_folder_path
+    return ensure_resource_subdir(get_resource_root() / "sheets", sheet_id)
+  File "/app/app/ssextractor.py", line 157, in ensure_resource_subdir
+    folder.mkdir(parents=True, exist_ok=True)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1184, in mkdir
+    if not exist_ok or not self.is_dir():
+  File "/usr/local/lib/python3.10/pathlib.py", line 1305, in is_dir
+    return S_ISDIR(self.stat().st_mode)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1097, in stat
+    return self._accessor.stat(self, follow_symlinks=follow_symlinks)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/hsrTsj/sheets/3933054758244228'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/main.py", line 89, in run_migration
+    upload_to_google_drive(sheet_id)
+  File "/app/app/ssextractor.py", line 567, in upload_to_google_drive
+    print(f"Error uploading {file_path} to Google Drive: {e}")
+UnboundLocalError: local variable 'file_path' referenced before assignment
+2026-02-03 04:14:50,234 INFO Received migration request.
+2026-02-03 04:14:55,833 INFO Starting migration thread.
+2026-02-03 04:14:55,833 INFO Migration started.
+2026-02-03 04:15:40,480 INFO Received migration request.
+2026-02-03 04:15:46,073 INFO Starting migration thread.
+2026-02-03 04:15:46,073 INFO Migration started.
+2026-02-03 04:15:47,048 INFO Found 1 sheets in folder 3586264785020804.
+2026-02-03 04:15:47,049 INFO Processing sheet 3933054758244228.
+2026-02-03 04:16:10,244 ERROR Migration failed with an unhandled exception.
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.10/pathlib.py", line 1175, in mkdir
+    self._accessor.mkdir(self, mode)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/hsrTsj/sheets/3933054758244228'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/ssextractor.py", line 525, in upload_to_google_drive
+    sheet_folder = sheet_folder_path(sheet_id)
+  File "/app/app/ssextractor.py", line 161, in sheet_folder_path
+    return ensure_resource_subdir(get_resource_root() / "sheets", sheet_id)
+  File "/app/app/ssextractor.py", line 157, in ensure_resource_subdir
+    folder.mkdir(parents=True, exist_ok=True)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1184, in mkdir
+    if not exist_ok or not self.is_dir():
+  File "/usr/local/lib/python3.10/pathlib.py", line 1305, in is_dir
+    return S_ISDIR(self.stat().st_mode)
+  File "/usr/local/lib/python3.10/pathlib.py", line 1097, in stat
+    return self._accessor.stat(self, follow_symlinks=follow_symlinks)
+OSError: [Errno 112] Host is down: '/mnt/smartsheet/resource/hsrTsj/sheets/3933054758244228'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/app/app/main.py", line 89, in run_migration
+    upload_to_google_drive(sheet_id)
+  File "/app/app/ssextractor.py", line 567, in upload_to_google_drive
+    print(f"Error uploading {file_path} to Google Drive: {e}")
+UnboundLocalError: local variable 'file_path' referenced before assignment
+2026-02-03 04:18:51,954 INFO Received migration request.
+2026-02-03 04:18:57,696 INFO Starting migration thread.
+2026-02-03 04:18:57,697 INFO Migration started.
+2026-02-03 05:23:18,353 INFO Received migration request.
+2026-02-03 05:23:20,865 INFO Starting migration thread.
+2026-02-03 05:23:20,866 INFO Migration started.
+2026-02-03 05:24:22,284 INFO Received migration request.
+2026-02-03 05:24:27,432 INFO Starting migration thread.
+2026-02-03 05:24:27,432 INFO Migration started.
+2026-02-03 05:45:23,935 INFO Starting production server on port 5000...
+2026-02-03 05:49:28,286 INFO Received migration request.
+2026-02-03 05:49:36,160 INFO Starting migration thread.
+2026-02-03 05:49:36,161 INFO Migration started.
+2026-02-03 05:49:38,100 INFO Found 6 sheets in folder 3789904250464132.
+2026-02-03 05:49:38,101 INFO Processing sheet 4135490992164740.
+2026-02-03 05:50:12,726 INFO Received migration request.
+2026-02-03 05:50:15,393 INFO Processing sheet 1665643741925252.
+2026-02-03 05:50:24,217 INFO Starting migration thread.
+2026-02-03 05:50:24,217 INFO Migration started.
+2026-02-03 05:50:25,238 INFO Found 6 sheets in folder 3789904250464132.
+2026-02-03 05:50:25,238 INFO Processing sheet 4135490992164740.
+2026-02-03 05:50:39,306 INFO Processing sheet 4903323233636228.
+2026-02-03 05:51:02,467 INFO Processing sheet 1665643741925252.
+2026-02-03 05:51:03,532 INFO Processing sheet 5096841575092100.
+2026-02-03 05:51:20,811 INFO Processing sheet 5324990237855620.
+2026-02-03 05:51:27,694 INFO Processing sheet 4903323233636228.

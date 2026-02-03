@@ -32,14 +32,7 @@ def log(message):
 def index():
     if request.method == 'POST':
         log("Received migration request.")
-        # Reset cancel flag for each new migration
-        process_state.cancel_requested = False
-        if process_state.migration_status.get('running'):
-            log("Migration request rejected; migration already running.")
-            return render_template(
-                'index.html',
-                error_message="Migration already running. Please wait for completion.",
-            )
+        job_credentials = dict(config.CREDENTIALS)
         
         # Get configuration from form
         configuration = {
@@ -52,10 +45,10 @@ def index():
             "GOOGLE_AUTH_TYPE": request.form.get('google_auth_type') or config.CREDENTIALS.get("GOOGLE_AUTH_TYPE"),
         }
 
-        # Update global configuration, but do not overwrite existing values with None/empty strings
+        # Update job configuration, but do not overwrite existing values with None/empty strings
         for key, value in configuration.items():
             if value:
-                config.CREDENTIALS[key] = value
+                job_credentials[key] = value
 
         # Handle OAuth client secret upload (required when using OAuth)
         oauth_client_upload = request.files.get('google_oauth_client_secret_upload')
@@ -63,7 +56,7 @@ def index():
             target_name = secure_filename("client_secret.json")
             upload_path = os.path.join(app.config["UPLOAD_FOLDER"], target_name)
             oauth_client_upload.save(upload_path)
-            config.CREDENTIALS["GOOGLE_OAUTH_CLIENT_SECRET_FILE"] = target_name
+            job_credentials["GOOGLE_OAUTH_CLIENT_SECRET_FILE"] = target_name
 
         # Optional: accept an uploaded OAuth token file
         oauth_token_upload = request.files.get('google_oauth_token_upload')
@@ -71,13 +64,13 @@ def index():
             target_name = secure_filename("token.json")
             upload_path = os.path.join(app.config["UPLOAD_FOLDER"], target_name)
             oauth_token_upload.save(upload_path)
-            config.CREDENTIALS["GOOGLE_OAUTH_TOKEN_FILE"] = target_name
+            job_credentials["GOOGLE_OAUTH_TOKEN_FILE"] = target_name
 
         # Validate required fields before creating Drive folders.
         required_fields = {
-            "SMARTSHEET_API_KEY": config.CREDENTIALS.get("SMARTSHEET_API_KEY"),
-            "SMARTSHEET_FOLDER_ID": config.CREDENTIALS.get("SMARTSHEET_FOLDER_ID"),
-            "GOOGLE_DRIVE_PARENT_FOLDER_ID": config.CREDENTIALS.get("GOOGLE_DRIVE_PARENT_FOLDER_ID"),
+            "SMARTSHEET_API_KEY": job_credentials.get("SMARTSHEET_API_KEY"),
+            "SMARTSHEET_FOLDER_ID": job_credentials.get("SMARTSHEET_FOLDER_ID"),
+            "GOOGLE_DRIVE_PARENT_FOLDER_ID": job_credentials.get("GOOGLE_DRIVE_PARENT_FOLDER_ID"),
         }
         missing = [k for k, v in required_fields.items() if not v]
         if missing:
@@ -85,11 +78,12 @@ def index():
             return render_template('index.html', error_message=f"Missing required fields: {', '.join(missing)}")
 
         # Auto-create Drive subfolders under the parent.
-        parent_id = config.CREDENTIALS.get("GOOGLE_DRIVE_PARENT_FOLDER_ID")
+        parent_id = job_credentials.get("GOOGLE_DRIVE_PARENT_FOLDER_ID")
         try:
-            config.CREDENTIALS["GOOGLE_DRIVE_SHEETS_FOLDER_ID"] = get_or_create_drive_folder("sheets", parent_id)
-            config.CREDENTIALS["GOOGLE_DRIVE__COMMENTS_FOLDER_ID"] = get_or_create_drive_folder("comments", parent_id)
-            config.CREDENTIALS["GOOGLE_DRIVE_ATTACHMENTS_FOLDER_ID"] = get_or_create_drive_folder("attachments", parent_id)
+            token = config.set_thread_credentials(job_credentials)
+            job_credentials["GOOGLE_DRIVE_SHEETS_FOLDER_ID"] = get_or_create_drive_folder("sheets", parent_id)
+            job_credentials["GOOGLE_DRIVE__COMMENTS_FOLDER_ID"] = get_or_create_drive_folder("comments", parent_id)
+            job_credentials["GOOGLE_DRIVE_ATTACHMENTS_FOLDER_ID"] = get_or_create_drive_folder("attachments", parent_id)
         except Exception as e:
             log(f"Failed to initialize Drive subfolders under parent {parent_id}: {e}")
             return render_template(
@@ -100,23 +94,41 @@ def index():
                     "has access."
                 ),
             )
+        finally:
+            if 'token' in locals():
+                config.reset_thread_credentials(token)
 
-        #print(config.CREDENTIALS)
+        job_id = process_state.create_job()
+        job_credentials["JOB_ID"] = job_id
         # Start migration in a background thread
         log("Starting migration thread.")
-        threading.Thread(target=main.run_migration, name="migration-thread", daemon=True).start()
-        return render_template('migration_started.html')
+        threading.Thread(
+            target=main.run_migration,
+            args=(job_id, job_credentials),
+            name=f"migration-{job_id}",
+            daemon=True,
+        ).start()
+        return render_template('migration_started.html', job_id=job_id)
     return render_template('index.html')
 
 @app.route('/status', methods=['GET'])
 def status():
-    # Return current migration status as JSON
-    return jsonify(process_state.migration_status)
+    job_id = request.args.get("job_id")
+    if not job_id:
+        return jsonify({"error": "job_id is required"}), 400
+    status = process_state.get_status(job_id)
+    if not status:
+        return jsonify({"error": "job not found"}), 404
+    return jsonify(status)
 
 @app.route('/cancel', methods=['POST'])
 def cancel():
-    process_state.cancel_requested = True
-    return jsonify({"status": "cancelled"})
+    job_id = request.args.get("job_id")
+    if not job_id:
+        return jsonify({"error": "job_id is required"}), 400
+    if not process_state.request_cancel(job_id):
+        return jsonify({"error": "job not found"}), 404
+    return jsonify({"status": "cancel requested"})
 
 if __name__ == '__main__':
     from waitress import serve

@@ -13,9 +13,11 @@
     <button id="cancelButton" class="btn btn-danger">Cancel Migration</button>
   </div>
   <script>
+    const jobId = "{{ job_id }}";
     function pollStatus() {
     $.ajax({
       url: '/status',
+      data: { job_id: jobId },
       method: 'GET',
       success: function(data) {
         $('#status').text("Status: " + data.progress);
@@ -34,6 +36,7 @@
   $('#cancelButton').click(function(){
     $.ajax({
       url: '/cancel',
+      data: { job_id: jobId },
       method: 'POST',
       success: function(data) {
         $('#status').text("Migration cancellation requested.");

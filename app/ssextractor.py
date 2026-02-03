@@ -13,15 +13,18 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 #from dotenv import load_dotenv
 import time  # For sleep
-from process_state import cancel_requested  # or import process_state and reference process_state.cancel_requested
+import contextvars
+import process_state
 import config
 from pathlib import Path
 
 # Project paths (resource folder holds generated downloads)
 DEFAULT_BASE_DIR = r"\\relprdvintfs01.convergeict.com\Smartsheet$"
 
+_GOOGLE_CTX = contextvars.ContextVar("google_services_ctx", default=None)
+
 def get_base_dir() -> Path:
-    base_dir_raw = config.CREDENTIALS.get("SMARTSHEET_BASE_DIR") or DEFAULT_BASE_DIR
+    base_dir_raw = config.get_credential("SMARTSHEET_BASE_DIR") or DEFAULT_BASE_DIR
     if os.name != "nt" and base_dir_raw.startswith("\\\\"):
         raise RuntimeError(
             "UNC path configured on non-Windows host. Mount the share and set "
@@ -30,8 +33,11 @@ def get_base_dir() -> Path:
     return Path(base_dir_raw)
 
 def get_resource_root():
-    api_key = config.CREDENTIALS.get("SMARTSHEET_API_KEY")
+    api_key = config.get_credential("SMARTSHEET_API_KEY")
     user_suffix = api_key[-6:] if api_key and len(api_key) >= 6 else "default"
+    job_id = config.get_credential("JOB_ID")
+    if job_id:
+        return get_base_dir() / "resource" / user_suffix / job_id
     return get_base_dir() / "resource" / user_suffix
 
 # If you still need .env for other non-SMARTSHEET values, you can load it.
@@ -53,7 +59,7 @@ google_credentials = None
 DEFAULT_SERVICE_ACCOUNT_FILE = "SmartSheetDataArchive.json"
 
 def _get_google_auth_setting(key, default):
-    value = config.CREDENTIALS.get(key)
+    value = config.get_credential(key)
     return value if value else default
 
 def _load_user_credentials(client_secret_file, token_file):
@@ -76,17 +82,16 @@ def get_google_services():
     Returns Drive and Sheets service clients using either service account
     credentials or OAuth2 user credentials based on config.
     """
-    global drive_service, sheet_service, google_credentials
-
-    if google_credentials and drive_service and sheet_service:
+    ctx = _GOOGLE_CTX.get()
+    current_creds_id = id(config.get_credentials())
+    if ctx and ctx.get("creds_id") == current_creds_id:
         try:
-            if not google_credentials.valid:
-                google_credentials.refresh(Request())
-            return drive_service, sheet_service, google_credentials
+            if not ctx["google_credentials"].valid:
+                ctx["google_credentials"].refresh(Request())
+            return ctx["drive_service"], ctx["sheet_service"], ctx["google_credentials"]
         except Exception:
-            drive_service = None
-            sheet_service = None
-            google_credentials = None
+            ctx = None
+            _GOOGLE_CTX.set(None)
 
     auth_type = (_get_google_auth_setting("GOOGLE_AUTH_TYPE", "service_account")).lower()
     service_account_file = _get_google_auth_setting("GOOGLE_SERVICE_ACCOUNT_FILE", DEFAULT_SERVICE_ACCOUNT_FILE)
@@ -107,6 +112,14 @@ def get_google_services():
 
     drive_service = build("drive", "v3", credentials=google_credentials)
     sheet_service = build("sheets", "v4", credentials=google_credentials)
+    _GOOGLE_CTX.set(
+        {
+            "creds_id": current_creds_id,
+            "drive_service": drive_service,
+            "sheet_service": sheet_service,
+            "google_credentials": google_credentials,
+        }
+    )
     return drive_service, sheet_service, google_credentials
 
 def describe_drive_item(item_id, label):
@@ -130,7 +143,7 @@ def describe_drive_item(item_id, label):
 
 def get_smartsheet_client():
     import config
-    api_key = config.CREDENTIALS["SMARTSHEET_API_KEY"]
+    api_key = config.get_credential("SMARTSHEET_API_KEY")
     #print("DEBUG: API Key is:", api_key)  # This should print the key entered by the user
     if not api_key:
         raise ValueError("No API key provided. Please update config.CREDENTIALS.")
@@ -138,7 +151,7 @@ def get_smartsheet_client():
 
 def access_config_file(key):
     import config
-    config_value = config.CREDENTIALS[key]
+    config_value = config.get_credential(key)
     return config_value
     
 
@@ -529,7 +542,7 @@ def upload_to_google_drive(sheet_id):
             return None
 
         file_path = excel_files[0]  # Select first found file
-        GOOGLE_DRIVE_SHEETS_FOLDER_ID = config.CREDENTIALS["GOOGLE_DRIVE_SHEETS_FOLDER_ID"]
+        GOOGLE_DRIVE_SHEETS_FOLDER_ID = config.get_credential("GOOGLE_DRIVE_SHEETS_FOLDER_ID")
         # Ensure `sheets/{sheet_id}` folder exists in Google Drive
         print(f"Using Sheets parent folder ID: {GOOGLE_DRIVE_SHEETS_FOLDER_ID}")
         drive_sheet_folder_id = get_or_create_drive_folder(str(sheet_id), GOOGLE_DRIVE_SHEETS_FOLDER_ID)
@@ -582,8 +595,7 @@ def download_smartsheet_attachments(sheet_id):
         attachments_saved = False
         for row in sheet_data.rows:
             # Check for cancellation before processing a new row
-            from process_state import cancel_requested  # If not already imported globally
-            if cancel_requested:
+            if process_state.is_cancel_requested():
                 print("Cancellation requested before processing row; stopping attachments download.")
                 return
 
@@ -599,7 +611,7 @@ def download_smartsheet_attachments(sheet_id):
 
             for attachment in attachments:
                 # Check for cancellation before processing each attachment
-                if cancel_requested:
+                if process_state.is_cancel_requested():
                     print(f"Cancellation requested; stopping download for row {row_id}.")
                     return
 
@@ -623,7 +635,7 @@ def download_smartsheet_attachments(sheet_id):
                     with open(file_path, "wb") as file:
                         for chunk in response.iter_content(chunk_size=8192):
                             # Check for cancellation during file download
-                            if cancel_requested:
+                            if process_state.is_cancel_requested():
                                 print(f"Cancellation requested during download of {file_path}; stopping file download.")
                                 return
                             file.write(chunk)
@@ -645,7 +657,7 @@ def upload_comments_to_drive(sheet_id):
     """Uploads the comments Excel file to Google Drive inside comments/{sheet_id}/."""
     try:
         drive_service, _, _ = get_google_services()
-        GOOGLE_DRIVE__COMMENTS_FOLDER_ID = config.CREDENTIALS["GOOGLE_DRIVE__COMMENTS_FOLDER_ID"]
+        GOOGLE_DRIVE__COMMENTS_FOLDER_ID = config.get_credential("GOOGLE_DRIVE__COMMENTS_FOLDER_ID")
         print(f"Using Comments parent folder ID: {GOOGLE_DRIVE__COMMENTS_FOLDER_ID}")
         # Define the comments folder path
         comments_folder = comments_folder_path(sheet_id)
@@ -695,7 +707,7 @@ def upload_attachments_to_drive(sheet_id):
     """Uploads all attachments in resource/attachments/{sheet_id}/{row_id}/ to Google Drive."""
     try:
         drive_service, _, _ = get_google_services()
-        GOOGLE_DRIVE_ATTACHMENTS_FOLDER_ID = config.CREDENTIALS["GOOGLE_DRIVE_ATTACHMENTS_FOLDER_ID"]
+        GOOGLE_DRIVE_ATTACHMENTS_FOLDER_ID = config.get_credential("GOOGLE_DRIVE_ATTACHMENTS_FOLDER_ID")
         print(f"Using Attachments parent folder ID: {GOOGLE_DRIVE_ATTACHMENTS_FOLDER_ID}")
         # Define the base attachments directory
         attachments_folder = attachments_folder_path(sheet_id, create=False)
@@ -765,9 +777,9 @@ def send_data_to_appsheet_database(google_sheet_id, sheet_name):
     """Fetches data from Google Sheets and sends it to AppSheet Database."""
     try:
         _, _, google_creds = get_google_services()
-        APPSHEET_API_KEY = config.CREDENTIALS["APPSHEET_API_KEY"]
-        APPSHEET_APP_ID = config.CREDENTIALS["APPSHEET_APP_ID"]
-        APPSHEET_TABLE_NAME = config.CREDENTIALS["APPSHEET_TABLE_NAME"]
+        APPSHEET_API_KEY = config.get_credential("APPSHEET_API_KEY")
+        APPSHEET_APP_ID = config.get_credential("APPSHEET_APP_ID")
+        APPSHEET_TABLE_NAME = config.get_credential("APPSHEET_TABLE_NAME")
         # Fetch Google Sheets Data (Ensuring it remains an Excel file)
         url = f"https://sheets.googleapis.com/v4/spreadsheets/{google_sheet_id}/values/{sheet_name}!A1:Z1000"
         headers = {"Authorization": f"Bearer {google_creds.token}"}

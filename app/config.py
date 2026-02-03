@@ -1,5 +1,6 @@
 # config.py
 import os
+import contextvars
 
 try:
     from dotenv import load_dotenv
@@ -31,3 +32,22 @@ CREDENTIALS = {
     "GOOGLE_OAUTH_CLIENT_SECRET_FILE": os.getenv("GOOGLE_OAUTH_CLIENT_SECRET_FILE", "client_secret.json"),
     "GOOGLE_OAUTH_TOKEN_FILE": os.getenv("GOOGLE_OAUTH_TOKEN_FILE", "token.json"),
 }
+
+_CREDENTIALS_CTX = contextvars.ContextVar("credentials_override", default=None)
+
+
+def get_credentials():
+    creds = _CREDENTIALS_CTX.get()
+    return creds if creds is not None else CREDENTIALS
+
+
+def get_credential(key, default=None):
+    return get_credentials().get(key, default)
+
+
+def set_thread_credentials(creds):
+    return _CREDENTIALS_CTX.set(creds)
+
+
+def reset_thread_credentials(token):
+    _CREDENTIALS_CTX.reset(token)
