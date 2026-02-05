@@ -64,6 +64,19 @@ def update_status(job_id, *, running=None, progress=None, details=None, finished
         return True
 
 
+def update_current_status(*, running=None, progress=None, details=None, finished=False):
+    job_id = _current_job_id.get()
+    if not job_id:
+        return False
+    return update_status(
+        job_id,
+        running=running,
+        progress=progress,
+        details=details,
+        finished=finished,
+    )
+
+
 def request_cancel(job_id):
     with _jobs_lock:
         job = _jobs.get(job_id)

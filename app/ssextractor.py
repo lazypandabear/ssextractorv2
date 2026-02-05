@@ -40,6 +40,18 @@ def get_resource_root():
         return get_base_dir() / "resource" / user_suffix / job_id
     return get_base_dir() / "resource" / user_suffix
 
+
+def report_current_work(*, folder=None, file=None, note=None):
+    parts = []
+    if note:
+        parts.append(str(note))
+    if folder:
+        parts.append(f"Folder: {folder}")
+    if file:
+        parts.append(f"File: {file}")
+    if parts:
+        process_state.update_current_status(details=" | ".join(parts))
+
 # If you still need .env for other non-SMARTSHEET values, you can load it.
 #load_dotenv(override=True)
 # Use the credentials from the global config
@@ -227,6 +239,11 @@ def download_smartsheet_as_excel(sheet_id):
     try:
         # Define folders and paths under resource/sheets
         sheet_folder = sheet_folder_path(sheet_id)
+        report_current_work(
+            note="Downloading Smartsheet export",
+            folder=sheet_folder,
+            file=f"{sheet_id}.xlsx",
+        )
 
         # Download Excel and save it
         excel_data = smartsheet_client.Sheets.get_sheet_as_excel(sheet_id, sheet_folder)
@@ -237,6 +254,11 @@ def download_smartsheet_as_excel(sheet_id):
             if os.path.abspath(latest_file) != os.path.abspath(target_path):
                 os.replace(latest_file, target_path)
                 print(f"Renamed Excel file to {target_path}")
+            report_current_work(
+                note="Downloaded Smartsheet export",
+                folder=sheet_folder,
+                file=target_path,
+            )
         print(f"Smartsheet {sheet_id} downloaded")
         return None
 
@@ -286,6 +308,11 @@ def extract_and_store_comments(sheet_id):
 
         excel_path = excel_files[0]
         comments_folder = comments_folder_path(sheet_id)
+        report_current_work(
+            note="Extracting comments",
+            folder=comments_folder,
+            file=f"{sheet_id}_comments.xlsx",
+        )
 
         original_file = wait_for_excel_file(sheet_folder, retries=100, delay=2)  # Use the first (and only) file
 
@@ -303,7 +330,11 @@ def extract_and_store_comments(sheet_id):
             df_comments["Actual Row ID"] = df_comments["Actual Row ID"].map(format_row_id)
         df_comments.to_excel(f"{comments_folder}/{sheet_id}_comments.xlsx", index=False)
 
-
+        report_current_work(
+            note="Saved comments",
+            folder=comments_folder,
+            file=f"{comments_folder}/{sheet_id}_comments.xlsx",
+        )
 
         print(f"Saved comments to {comments_folder}/{sheet_id}_comments.xlsx")
 
@@ -365,6 +396,11 @@ def create_relative_row_mapping(sheet_id):
         mapping_path = os.path.join(mapping_folder, f"{sheet_id}_relative_row_mapping.xlsx")
         df_mapping.to_excel(mapping_path, index=False)
 
+        report_current_work(
+            note="Saved row mapping",
+            folder=mapping_folder,
+            file=mapping_path,
+        )
         print(f" Created Relative Row → Row ID mapping table: {mapping_path}")
         return df_mapping
 
@@ -381,6 +417,11 @@ def prepare_sheet_for_drive_upload(sheet_id):
         smartsheet_client = get_smartsheet_client()
         # ? Define folders and paths
         sheet_folder = sheet_folder_path(sheet_id)
+        report_current_work(
+            note="Preparing sheet for Drive upload",
+            folder=sheet_folder,
+            file=f"{sheet_id}.xlsx",
+        )
 
         original_file = wait_for_excel_file(sheet_folder, retries=100, delay=2)  # Use the first (and only) file
         if not original_file:
@@ -407,6 +448,11 @@ def prepare_sheet_for_drive_upload(sheet_id):
         updated_excel_path = os.path.join(sheet_folder, f"{sheet_id}.xlsx")
         df.to_excel(updated_excel_path, index=False)
 
+        report_current_work(
+            note="Prepared sheet for Drive upload",
+            folder=sheet_folder,
+            file=updated_excel_path,
+        )
         # ? Delete the original downloaded file after modification
         if os.path.exists(original_file) and os.path.abspath(original_file) != os.path.abspath(updated_excel_path):
             os.remove(original_file)
@@ -474,7 +520,12 @@ def merge_comments_with_row_mapping(sheet_id):
         # Save the updated comments table
         merged_file_path = os.path.join(comments_folder, f"{sheet_id}_comments.xlsx")
         df_merged.to_excel(merged_file_path, index=False)
-        
+
+        report_current_work(
+            note="Merged comments",
+            folder=comments_folder,
+            file=merged_file_path,
+        )
         print(f"Merged comments saved: {merged_file_path}")
         return merged_file_path
     except Exception as e:
@@ -557,6 +608,11 @@ def upload_to_google_drive(sheet_id):
             "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "parents": [drive_sheet_folder_id],
         }
+        report_current_work(
+            note="Uploading sheet to Drive",
+            folder=sheet_folder,
+            file=file_path,
+        )
         media = MediaFileUpload(file_path, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         print(f"Uploading sheet to Drive: {file_path} parent={drive_sheet_folder_id}")
         file = drive_service.files().create(
@@ -624,6 +680,11 @@ def download_smartsheet_attachments(sheet_id):
                 file_url = retrieve_att.url  # Check if it's downloadable
 
                 if file_url:
+                    report_current_work(
+                        note="Downloading attachment",
+                        folder=row_folder,
+                        file=file_name,
+                    )
                     # Smartsheet returns a pre-signed URL; adding Authorization breaks S3 downloads
                     response = requests.get(file_url, stream=True, allow_redirects=True)
                     if response.status_code != 200:
@@ -679,6 +740,11 @@ def upload_comments_to_drive(sheet_id):
             "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "parents": [drive_folder_id],
         }
+        report_current_work(
+            note="Uploading comments to Drive",
+            folder=comments_folder,
+            file=file_path,
+        )
         media = MediaFileUpload(file_path, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         print(f"Uploading comments to Drive: {file_path} parent={drive_folder_id}")
         file = drive_service.files().create(
@@ -743,6 +809,11 @@ def upload_attachments_to_drive(sheet_id):
                     "mimeType": "application/octet-stream",
                     "parents": [drive_row_folder_id],
                 }
+                report_current_work(
+                    note="Uploading attachment to Drive",
+                    folder=row_folder_path,
+                    file=file_name,
+                )
                 media = MediaFileUpload(file_path, mimetype="application/octet-stream")
                 print(f"Uploading attachment to Drive: {file_path} parent={drive_row_folder_id}")
                 file = drive_service.files().create(

@@ -10,6 +10,7 @@
   <div class="container my-5">
     <h1>Migration In Progress</h1>
     <p id="status" class="alert alert-info">Starting migration...</p>
+    <div id="details" class="text-muted small">Waiting for file activity...</div>
     <button id="cancelButton" class="btn btn-danger">Cancel Migration</button>
   </div>
   <script>
@@ -20,10 +21,20 @@
       data: { job_id: jobId },
       method: 'GET',
       success: function(data) {
-        $('#status').text("Status: " + data.progress);
+        const progressText = data.progress || "Working...";
+        $('#status').text("Status: " + progressText);
+        if (data.details) {
+          $('#details').text(data.details);
+        }
         // If the migration is no longer running (e.g. cancelled or completed)
         if (!data.running) {
           clearInterval(statusInterval);
+          const isCompleted = progressText.toLowerCase().includes("completed");
+          if (isCompleted) {
+            alert("Migration completed. Click OK to return to the main page.");
+            window.location.href = '/';
+            return;
+          }
           // Redirect to home after a short delay (e.g. 2 seconds)
           setTimeout(function(){
             window.location.href = '/';
@@ -46,6 +57,5 @@
 
   var statusInterval = setInterval(pollStatus, 1000);
 </script>
-  </script>
 </body>
 </html>
