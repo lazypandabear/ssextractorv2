@@ -9,12 +9,27 @@
 <body>
   <div class="container my-5">
     <h1>Migration In Progress</h1>
+    <div class="mb-2 text-muted small">Session ID: <span id="sessionId">{{ job_id }}</span></div>
     <p id="status" class="alert alert-info">Starting migration...</p>
     <div id="details" class="text-muted small">Waiting for file activity...</div>
     <button id="cancelButton" class="btn btn-danger">Cancel Migration</button>
   </div>
+  <div id="completionOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="background: rgba(0,0,0,0.55); z-index: 1050;">
+    <div class="bg-white p-4 rounded shadow" style="max-width: 480px; margin: 20vh auto 0;">
+      <h5 id="completionTitle" class="mb-2">Migration Completed</h5>
+      <p id="completionMessage" class="mb-2">Your migration session has finished.</p>
+      <div class="text-muted small mb-3">Session ID: <span id="completionSessionId">{{ job_id }}</span></div>
+      <button id="completionOk" class="btn btn-primary">OK</button>
+    </div>
+  </div>
   <script>
     const jobId = "{{ job_id }}";
+    let completionHandled = false;
+    function showCompletion(message, isSuccess) {
+      $('#completionTitle').text(isSuccess ? 'Migration Completed' : 'Migration Finished');
+      $('#completionMessage').text(message);
+      $('#completionOverlay').removeClass('d-none');
+    }
     function pollStatus() {
     $.ajax({
       url: '/status',
@@ -29,20 +44,19 @@
         // If the migration is no longer running (e.g. cancelled or completed)
         if (!data.running) {
           clearInterval(statusInterval);
-          const isCompleted = progressText.toLowerCase().includes("completed");
-          if (isCompleted) {
-            alert("Migration completed. Click OK to return to the main page.");
-            window.location.href = '/';
-            return;
+          const isCompleted = progressText.toLowerCase().includes("completed") || Boolean(data.finished_at);
+          if (isCompleted && !completionHandled) {
+            completionHandled = true;
+            showCompletion(`Status: ${progressText}`, progressText.toLowerCase().includes("completed"));
           }
-          // Redirect to home after a short delay (e.g. 2 seconds)
-          setTimeout(function(){
-            window.location.href = '/';
-          }, 2000);
         }
       }
     });
   }
+
+  $('#completionOk').click(function(){
+    window.location.href = '/';
+  });
 
   $('#cancelButton').click(function(){
     $.ajax({
