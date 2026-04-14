@@ -1,5 +1,7 @@
 import re
 import os
+import shutil
+import mimetypes
 import pandas as pd
 import requests
 import glob  # Used for wildcard search
@@ -17,28 +19,64 @@ import contextvars
 import process_state
 import config
 from pathlib import Path
+from archive_settings import get_active_archive_root_id
 
 # Project paths (resource folder holds generated downloads)
-DEFAULT_BASE_DIR = r"\\relprdvintfs01.convergeict.com\Smartsheet$"
+DEFAULT_BASE_DIR = Path("/app/tempData")
+DEFAULT_ARCHIVE_DRIVE_ROOT_FOLDER_ID = "1etSuruprwmdWmHgPiIEePHlb02xRVUXR"
 
 _GOOGLE_CTX = contextvars.ContextVar("google_services_ctx", default=None)
 
 def get_base_dir() -> Path:
-    base_dir_raw = config.get_credential("SMARTSHEET_BASE_DIR") or DEFAULT_BASE_DIR
+    base_dir_raw = config.get_credential("SMARTSHEET_BASE_DIR") or str(DEFAULT_BASE_DIR)
     if os.name != "nt" and base_dir_raw.startswith("\\\\"):
         raise RuntimeError(
-            "UNC path configured on non-Windows host. Mount the share and set "
-            "SMARTSHEET_BASE_DIR to the mount path (e.g., /mnt/smartsheet)."
+            "UNC path configured on non-Windows host. Contact your administrator "
+            "to mount the network share locally and set SMARTSHEET_BASE_DIR "
+            "to the correct mounted path."
         )
-    return Path(base_dir_raw)
+
+    base_dir = Path(base_dir_raw)
+
+    try:
+        base_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise RuntimeError(
+            f"Unable to access SMARTSHEET_BASE_DIR at {base_dir}: {exc}"
+        ) from exc
+
+    if not base_dir.is_dir():
+        raise RuntimeError(f"SMARTSHEET_BASE_DIR is not a directory: {base_dir}")
+
+    return base_dir
+
+
+def validate_storage_health() -> Path:
+    """
+    Validate the configured storage base path before startup or a migration run.
+    Raises RuntimeError when the working directory cannot be created or accessed.
+    """
+    return get_base_dir()
+
+
+def get_storage_user_suffix() -> str:
+    api_key = config.get_credential("SMARTSHEET_API_KEY")
+    return api_key[-6:] if api_key and len(api_key) >= 6 else "default"
 
 def get_resource_root():
-    api_key = config.get_credential("SMARTSHEET_API_KEY")
-    user_suffix = api_key[-6:] if api_key and len(api_key) >= 6 else "default"
+    user_suffix = get_storage_user_suffix()
     job_id = config.get_credential("JOB_ID")
     if job_id:
         return get_base_dir() / "resource" / user_suffix / job_id
     return get_base_dir() / "resource" / user_suffix
+
+
+def get_archive_drive_root_folder_id():
+    job_override_root_id = config.get_credential("GOOGLE_DRIVE_ARCHIVE_ROOT_FOLDER_ID")
+    return get_active_archive_root_id(
+        default_root_id=DEFAULT_ARCHIVE_DRIVE_ROOT_FOLDER_ID,
+        override_root_id=job_override_root_id,
+    )
 
 
 def report_current_work(*, folder=None, file=None, note=None):
@@ -161,6 +199,54 @@ def get_smartsheet_client():
         raise ValueError("No API key provided. Please update config.CREDENTIALS.")
     return smartsheet.Smartsheet(api_key)
 
+def iter_sheet_rows(smartsheet_client, sheet_id, page_size=500):
+    """
+    Yield all rows for a sheet using pagination.
+    Smartsheet defaults to ~100 rows per call; without paging, large sheets are truncated.
+    """
+    if not page_size or page_size <= 0:
+        page_size = 500
+
+    page = 1
+    use_list_rows = hasattr(smartsheet_client.Sheets, "list_rows")
+
+    while True:
+        if process_state.is_cancel_requested():
+            return
+
+        if use_list_rows:
+            try:
+                result = smartsheet_client.Sheets.list_rows(sheet_id, page_size=page_size, page=page)
+                rows = getattr(result, "data", None) or getattr(result, "rows", None) or []
+                if not rows:
+                    break
+                for row in rows:
+                    yield row
+
+                total_pages = getattr(result, "total_pages", None) or getattr(result, "totalPages", None)
+                if total_pages and page >= total_pages:
+                    break
+                if len(rows) < page_size:
+                    break
+                page += 1
+                continue
+            except (AttributeError, TypeError):
+                use_list_rows = False
+
+        try:
+            sheet = smartsheet_client.Sheets.get_sheet(sheet_id, page_size=page_size, page=page)
+        except TypeError:
+            sheet = smartsheet_client.Sheets.get_sheet(sheet_id, pageSize=page_size, page=page)
+
+        rows = getattr(sheet, "rows", None) or []
+        if not rows:
+            break
+        for row in rows:
+            yield row
+        if len(rows) < page_size:
+            break
+        page += 1
+
 def access_config_file(key):
     import config
     config_value = config.get_credential(key)
@@ -182,14 +268,14 @@ def ensure_resource_subdir(base_path: Path, sheet_id=None, create=True) -> str:
         folder.mkdir(parents=True, exist_ok=True)
     return str(folder)
 
-def sheet_folder_path(sheet_id):
-    return ensure_resource_subdir(get_resource_root() / "sheets", sheet_id)
+def sheet_folder_path(sheet_id, create=True):
+    return ensure_resource_subdir(get_resource_root() / "sheets", sheet_id, create=create)
 
-def comments_folder_path(sheet_id):
-    return ensure_resource_subdir(get_resource_root() / "comments", sheet_id)
+def comments_folder_path(sheet_id, create=True):
+    return ensure_resource_subdir(get_resource_root() / "comments", sheet_id, create=create)
 
-def row_mapping_folder_path(sheet_id):
-    return ensure_resource_subdir(get_resource_root() / "row_mapping", sheet_id)
+def row_mapping_folder_path(sheet_id, create=True):
+    return ensure_resource_subdir(get_resource_root() / "row_mapping", sheet_id, create=create)
 
 def attachments_folder_path(sheet_id, create=True):
     return ensure_resource_subdir(get_resource_root() / "attachments", sheet_id, create=create)
@@ -284,8 +370,9 @@ def fetch_smartsheet_row_ids(sheet_id):
     """Fetches all row IDs from Smartsheet and returns a row number to row ID mapping."""
     try:
         smartsheet_client = get_smartsheet_client()
-        sheet_data = smartsheet_client.Sheets.get_sheet(sheet_id)
-        row_mapping = {row.row_number: row.id for row in sheet_data.rows}  # Map row number → row ID
+        row_mapping = {}
+        for row in iter_sheet_rows(smartsheet_client, sheet_id):
+            row_mapping[row.row_number] = row.id  # Map row number → row ID
 
         print(f" Retrieved {len(row_mapping)} Smartsheet row IDs for Sheet {sheet_id}")
         return row_mapping
@@ -434,9 +521,9 @@ def prepare_sheet_for_drive_upload(sheet_id):
             df = pd.read_excel(xls, sheet_name=sheet_name)
 
         # ? Fetch Smartsheet Row IDs in bulk (Efficient)
-        sheet_data = smartsheet_client.Sheets.get_sheet(sheet_id)
-
-        row_ids = [format_row_id(row.id) for row in sheet_data.rows]
+        row_records = [(row.row_number, row.id) for row in iter_sheet_rows(smartsheet_client, sheet_id)]
+        row_records.sort(key=lambda pair: pair[0])
+        row_ids = [format_row_id(row_id) for _, row_id in row_records]
         if len(row_ids) < len(df):
             row_ids.extend([""] * (len(df) - len(row_ids)))
         df["Row ID"] = row_ids[:len(df)]
@@ -581,6 +668,180 @@ def get_or_create_drive_folder(folder_name, parent_folder_id):
         return None
 
 
+def ensure_drive_folder_path(folder_parts, root_folder_id, folder_cache=None):
+    """Ensure a nested Drive folder path exists and return the final folder ID."""
+    folder_cache = folder_cache if folder_cache is not None else {}
+    current_parent_id = root_folder_id
+
+    for folder_name in folder_parts:
+        cache_key = (current_parent_id, folder_name)
+        folder_id = folder_cache.get(cache_key)
+        if folder_id is None:
+            folder_id = get_or_create_drive_folder(folder_name, current_parent_id)
+            if not folder_id:
+                raise RuntimeError(
+                    f"Unable to create or access Drive folder '{folder_name}' under {current_parent_id}."
+                )
+            folder_cache[cache_key] = folder_id
+        current_parent_id = folder_id
+
+    return current_parent_id
+
+
+def upload_file_to_drive_parent(drive_service, file_path, parent_folder_id, *, note, folder=None):
+    """Upload a single local file to a specific Drive folder."""
+    mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
+    file_metadata = {
+        "name": os.path.basename(file_path),
+        "mimeType": mime_type,
+        "parents": [parent_folder_id],
+    }
+    report_current_work(
+        note=note,
+        folder=folder or os.path.dirname(file_path),
+        file=file_path,
+    )
+    media = MediaFileUpload(file_path, mimetype=mime_type)
+    print(f"Uploading file to Drive: {file_path} parent={parent_folder_id}")
+    file = drive_service.files().create(
+        body=file_metadata,
+        media_body=media,
+        fields="id",
+        supportsAllDrives=True,
+    ).execute()
+    return file.get("id")
+
+
+def upload_folder_tree_to_drive(local_folder, drive_folder_id, *, note_prefix, folder_cache=None):
+    """Upload a local folder tree to Drive, preserving folders below the given root."""
+    folder_cache = folder_cache if folder_cache is not None else {}
+    drive_service, _, _ = get_google_services()
+    uploaded_file_ids = []
+
+    for current_root, dir_names, file_names in os.walk(local_folder):
+        dir_names.sort()
+        file_names.sort()
+        relative_parts = Path(current_root).relative_to(local_folder).parts
+        current_parent_id = (
+            ensure_drive_folder_path(relative_parts, drive_folder_id, folder_cache)
+            if relative_parts
+            else drive_folder_id
+        )
+
+        for file_name in file_names:
+            file_path = os.path.join(current_root, file_name)
+            uploaded_file_ids.append(
+                upload_file_to_drive_parent(
+                    drive_service,
+                    file_path,
+                    current_parent_id,
+                    note=note_prefix,
+                    folder=current_root,
+                )
+            )
+
+    return uploaded_file_ids
+
+
+def upload_archive_copy_to_drive(sheet_id):
+    """
+    Upload a duplicate archive copy into:
+    <archive-root>/resource/<api-suffix>/{sheets,comments,rowmapping,attachment}/...
+    """
+    try:
+        archive_root_id = get_archive_drive_root_folder_id()
+        if not archive_root_id:
+            print("No archive Drive root folder ID configured; skipping duplicate archive upload.")
+            return None
+
+        print(f"Using archive Drive root folder ID: {archive_root_id}")
+        folder_cache = {}
+        archive_user_root_id = ensure_drive_folder_path(
+            ["resource", get_storage_user_suffix()],
+            archive_root_id,
+            folder_cache,
+        )
+
+        archive_sections = [
+            ("sheets", sheet_folder_path(sheet_id, create=False), "Uploading archive sheet"),
+            ("comments", comments_folder_path(sheet_id, create=False), "Uploading archive comments"),
+            ("rowmapping", row_mapping_folder_path(sheet_id, create=False), "Uploading archive row mapping"),
+            ("attachment", attachments_folder_path(sheet_id, create=False), "Uploading archive attachment"),
+        ]
+        uploaded_files = {}
+
+        for section_name, local_folder, note_prefix in archive_sections:
+            if not os.path.isdir(local_folder):
+                print(f"Archive source not found for {section_name}/{sheet_id}: {local_folder}")
+                continue
+
+            section_folder_id = ensure_drive_folder_path(
+                [section_name, str(sheet_id)],
+                archive_user_root_id,
+                folder_cache,
+            )
+            uploaded_files[section_name] = upload_folder_tree_to_drive(
+                local_folder,
+                section_folder_id,
+                note_prefix=note_prefix,
+                folder_cache=folder_cache,
+            )
+
+        return uploaded_files
+
+    except HttpError as e:
+        print(f"Drive upload failed for duplicate archive under sheet {sheet_id}: {e}")
+        try:
+            print(f"Drive error details: {e.error_details}")
+        except Exception:
+            pass
+        return None
+    except Exception as e:
+        print(f"Error uploading duplicate archive for sheet {sheet_id}: {e}")
+        return None
+
+
+def prune_empty_parent_dirs(start_path: Path, stop_path: Path) -> None:
+    """Remove empty directories walking upward until stop_path is reached."""
+    current_path = start_path
+
+    while current_path != stop_path:
+        if current_path.exists():
+            try:
+                current_path.rmdir()
+            except OSError:
+                break
+        current_path = current_path.parent
+
+
+def cleanup_sheet_temp_data(sheet_id):
+    """Delete temporary local files for a processed sheet and prune empty parent folders."""
+    temp_folders = [
+        Path(sheet_folder_path(sheet_id, create=False)),
+        Path(comments_folder_path(sheet_id, create=False)),
+        Path(row_mapping_folder_path(sheet_id, create=False)),
+        Path(attachments_folder_path(sheet_id, create=False)),
+    ]
+    removed_folders = []
+
+    for folder in temp_folders:
+        if not folder.exists():
+            continue
+        try:
+            shutil.rmtree(folder)
+        except OSError as exc:
+            print(f"Failed to remove temp folder {folder}: {exc}")
+            continue
+        removed_folders.append(str(folder))
+        print(f"Removed temp folder: {folder}")
+
+    try:
+        prune_empty_parent_dirs(get_resource_root(), get_base_dir())
+    except OSError as exc:
+        print(f"Failed to prune empty temp folders for sheet {sheet_id}: {exc}")
+    return removed_folders
+
+
 def upload_to_google_drive(sheet_id):
     """Uploads an Excel file to Google Drive in sheets/{sheet_id} folder."""
     try:
@@ -637,81 +898,158 @@ def upload_to_google_drive(sheet_id):
         return None
     
 def download_smartsheet_attachments(sheet_id):
+    """Downloads all attachments from a Smartsheet and saves them in resource/attachments/{sheet_id}/{row_id}/."""
     smartsheet_client = get_smartsheet_client()
-    """Downloads all attachments from a Smartsheet and saves them in resource/attachments/{sheet_id}/{row_id}/"""
+    stats = {
+        "rows_seen": 0,
+        "rows_failed": 0,
+        "rows_with_attachments": 0,
+        "rows_with_saved_files": 0,
+        "attachments_seen": 0,
+        "attachments_saved": 0,
+        "attachments_failed": 0,
+    }
 
     try:
         print(f"Starting download of attachments for sheet {sheet_id}")
         # Create base folder for the sheet's attachments
         base_folder = attachments_folder_path(sheet_id, create=False)
 
-        # Get all rows in the sheet
-        sheet_data = smartsheet_client.Sheets.get_sheet(sheet_id)
-
-        attachments_saved = False
-        for row in sheet_data.rows:
+        for row in iter_sheet_rows(smartsheet_client, sheet_id):
             # Check for cancellation before processing a new row
             if process_state.is_cancel_requested():
                 print("Cancellation requested before processing row; stopping attachments download.")
-                return
+                return stats
 
+            stats["rows_seen"] += 1
             row_id = row.id  # Unique Row ID in Smartsheet
             row_folder = os.path.join(base_folder, str(row_id))
 
-            # Get all attachments for this row
-            attachments = smartsheet_client.Attachments.list_row_attachments(sheet_id, row_id).data
+            # Some API failures return an Error model (without `data`) instead of raising.
+            try:
+                row_attachments_result = smartsheet_client.Attachments.list_row_attachments(sheet_id, row_id)
+            except Exception as list_err:
+                stats["rows_failed"] += 1
+                print(f"Skipped row {row_id}: failed to list attachments ({list_err})")
+                continue
+
+            attachments = getattr(row_attachments_result, "data", None)
+            if attachments is None:
+                stats["rows_failed"] += 1
+                print(
+                    f"Skipped row {row_id}: list_row_attachments returned "
+                    f"{type(row_attachments_result).__name__} "
+                    f"(message={getattr(row_attachments_result, 'message', None)}, "
+                    f"error_code={getattr(row_attachments_result, 'error_code', None)})"
+                )
+                continue
+
             if not attachments:
                 continue
 
+            stats["rows_with_attachments"] += 1
             row_folder_created = False
+            row_saved_any = False
 
             for attachment in attachments:
                 # Check for cancellation before processing each attachment
                 if process_state.is_cancel_requested():
                     print(f"Cancellation requested; stopping download for row {row_id}.")
-                    return
+                    return stats
 
-                att_id = attachment.id
-                file_name = sanitize_filename(attachment.name)  # Clean the filename
+                stats["attachments_seen"] += 1
+                att_id = getattr(attachment, "id", None)
+                raw_name = getattr(attachment, "name", None) or f"attachment_{att_id}"
+                file_name = sanitize_filename(raw_name)  # Clean the filename
                 file_path = os.path.join(row_folder, file_name)
 
                 # Fetch attachment details
-                retrieve_att = smartsheet_client.Attachments.get_attachment(sheet_id, att_id)
-                file_url = retrieve_att.url  # Check if it's downloadable
+                try:
+                    retrieve_att = smartsheet_client.Attachments.get_attachment(sheet_id, att_id)
+                except Exception as get_err:
+                    stats["attachments_failed"] += 1
+                    print(f"Skipped {file_name} (row {row_id}): get_attachment failed ({get_err})")
+                    continue
 
-                if file_url:
-                    report_current_work(
-                        note="Downloading attachment",
-                        folder=row_folder,
-                        file=file_name,
+                file_url = getattr(retrieve_att, "url", None)
+                if not file_url:
+                    stats["attachments_failed"] += 1
+                    print(
+                        f"Skipped {file_name} (row {row_id}): no download URL "
+                        f"(response={type(retrieve_att).__name__}, "
+                        f"message={getattr(retrieve_att, 'message', None)}, "
+                        f"error_code={getattr(retrieve_att, 'error_code', None)})"
                     )
-                    # Smartsheet returns a pre-signed URL; adding Authorization breaks S3 downloads
-                    response = requests.get(file_url, stream=True, allow_redirects=True)
-                    if response.status_code != 200:
-                        print(f"Skipped {file_name}: download returned {response.status_code} ({response.text[:200]})")
-                        continue
-                    if not row_folder_created:
-                        os.makedirs(row_folder, exist_ok=True)  # Create folder for row only when saving a file
-                        row_folder_created = True
+                    continue
+
+                report_current_work(
+                    note="Downloading attachment",
+                    folder=row_folder,
+                    file=file_name,
+                )
+                # Smartsheet returns a pre-signed URL; adding Authorization breaks S3 downloads
+                try:
+                    response = requests.get(file_url, stream=True, allow_redirects=True, timeout=60)
+                except requests.RequestException as req_err:
+                    stats["attachments_failed"] += 1
+                    print(f"Skipped {file_name} (row {row_id}): request failed ({req_err})")
+                    continue
+
+                if response.status_code != 200:
+                    stats["attachments_failed"] += 1
+                    body_preview = ""
+                    try:
+                        body_preview = response.text[:200]
+                    except Exception:
+                        pass
+                    print(
+                        f"Skipped {file_name} (row {row_id}): download returned "
+                        f"{response.status_code} ({body_preview})"
+                    )
+                    continue
+
+                if not row_folder_created:
+                    os.makedirs(row_folder, exist_ok=True)  # Create folder for row only when saving a file
+                    row_folder_created = True
+
+                try:
                     with open(file_path, "wb") as file:
                         for chunk in response.iter_content(chunk_size=8192):
                             # Check for cancellation during file download
                             if process_state.is_cancel_requested():
                                 print(f"Cancellation requested during download of {file_path}; stopping file download.")
-                                return
-                            file.write(chunk)
-                    print(f"Downloaded: {file_path}")
-                    attachments_saved = True
-                else:
-                    print(f"Skipped (No download link): {file_name}")
+                                return stats
+                            if chunk:
+                                file.write(chunk)
+                except Exception as write_err:
+                    stats["attachments_failed"] += 1
+                    print(f"Failed writing {file_path}: {write_err}")
+                    continue
 
-        if not attachments_saved:
+                print(f"Downloaded: {file_path}")
+                stats["attachments_saved"] += 1
+                row_saved_any = True
+
+            if row_saved_any:
+                stats["rows_with_saved_files"] += 1
+
+        if stats["attachments_saved"] == 0:
             prune_empty_dirs(base_folder)
 
-        print(f"Completed downloading all attachments for sheet {sheet_id}")
+        print(
+            f"Completed downloading all attachments for sheet {sheet_id} | "
+            f"rows_seen={stats['rows_seen']} rows_failed={stats['rows_failed']} "
+            f"rows_with_attachments={stats['rows_with_attachments']} "
+            f"rows_with_saved_files={stats['rows_with_saved_files']} "
+            f"attachments_seen={stats['attachments_seen']} "
+            f"attachments_saved={stats['attachments_saved']} "
+            f"attachments_failed={stats['attachments_failed']}"
+        )
+        return stats
 
     except Exception as e:
         print(f"Error downloading attachments for sheet {sheet_id}: {e}")
+        return stats
 
 
 def upload_comments_to_drive(sheet_id):

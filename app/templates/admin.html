@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Archive Settings</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+  <div class="container my-5">
+    <h1 class="mb-3">Admin: Archive Root Settings</h1>
+    <p class="text-muted">
+      Use this page to rotate archive Drive root folders before hitting the 500k-file limit.
+      Updates apply without restarting the app.
+    </p>
+    <div class="alert alert-info">
+      In Shared Drive, create a folder and name <code>SMARTSHEET_BACKUP_{Number e.g. 2}</code>, then copy the ID in the URL after <code>drive/folders/{"THIS ID"}</code>. Paste that folder ID in the form below and click <strong>Save Runtime Settings</strong>.
+    </div>
+
+    {% if message %}
+      <div class="alert alert-success">{{ message }}</div>
+    {% endif %}
+    {% if error_message %}
+      <div class="alert alert-danger">{{ error_message }}</div>
+    {% endif %}
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <h5 class="card-title">Current Runtime Settings</h5>
+        <p class="mb-1"><strong>Default fallback root:</strong> <code>{{ default_root_id }}</code></p>
+        <p class="mb-1"><strong>Active root:</strong> <code>{{ settings.active_archive_root_folder_id }}</code></p>
+        <p class="mb-0"><strong>Updated at:</strong> {{ settings.updated_at or "Never (using fallback)" }}</p>
+      </div>
+    </div>
+
+    <form method="POST">
+      <div class="mb-3">
+        <label for="active_archive_root_folder_id" class="form-label">Active Archive Root Folder ID</label>
+        <input
+          type="text"
+          class="form-control"
+          id="active_archive_root_folder_id"
+          name="active_archive_root_folder_id"
+          value="{{ settings.active_archive_root_folder_id }}"
+          required
+        >
+      </div>
+
+      <div class="mb-3">
+        <label for="archive_root_folder_ids" class="form-label">Archive Root Folder IDs (comma or newline separated)</label>
+        <textarea
+          class="form-control"
+          id="archive_root_folder_ids"
+          name="archive_root_folder_ids"
+          rows="6"
+        >{{ settings.archive_root_folder_ids | join('\n') }}</textarea>
+        <div class="form-text">
+          Keep multiple root IDs here so you can switch active roots quickly when one approaches Drive limits.
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary">Save Runtime Settings</button>
+    </form>
+  </div>
+</body>
+</html>

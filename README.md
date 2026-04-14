@@ -1,12 +1,14 @@
 # Smartsheet to Google Drive (and AppSheet) Backup
 
-Simple app to pull Smartsheet data, comments, and attachments, then place them into Google Drive (and optionally AppSheet). You fill a web form, click **Start Migration**, and the files land in your Drive folders.
+Simple app to pull Smartsheet data, comments, and attachments, stage them in `/app/tempData`, then place them into Google Drive (and optionally AppSheet). You fill a web form, click **Start Migration**, and the files land in your Drive folders.
 
 ## What it does
 - Download each Smartsheet as Excel.
 - Extract comments.
 - Download row attachments.
 - Upload everything to your Google Drive folders.
+- Create a duplicate archive in a separate Google Drive root that mirrors `resource/<api-key-last-6>/...`.
+- Manage archive root rotation from `http://<host>:5000/admin` without restarting migrations.
 - (Optional) Send data to AppSheet.
 
 ## What you need
@@ -24,6 +26,10 @@ Simple app to pull Smartsheet data, comments, and attachments, then place them i
    GOOGLE_DRIVE_SHEETS_FOLDER_ID=...
    GOOGLE_DRIVE__COMMENTS_FOLDER_ID=...
    GOOGLE_DRIVE_ATTACHMENTS_FOLDER_ID=...
+   GOOGLE_DRIVE_ARCHIVE_ROOT_FOLDER_ID=...   # optional; defaults to the built-in archive root
+   ADMIN_USERNAME=admin
+   ADMIN_PASSWORD=change-me
+   ARCHIVE_ROOT_SETTINGS_FILE=archive_root_settings.json
    GOOGLE_AUTH_TYPE=service_account   # default; switch to oauth if needed
    GOOGLE_SERVICE_ACCOUNT_FILE=service_account.json
    GOOGLE_OAUTH_CLIENT_SECRET_FILE=client_secret.json
@@ -47,11 +53,11 @@ Simple app to pull Smartsheet data, comments, and attachments, then place them i
 - `app/` - application code.
   - `app/app.py` - Flask web form + status.
   - `app/main.py` - runs the migration steps.
-  - `app/ssextractor.py` - Smartsheet download, comment/attachment handling, Drive uploads (writes to `resource/`).
+  - `app/ssextractor.py` - Smartsheet download, comment/attachment handling, Drive uploads (uses `/app/tempData/resource/` as temp storage).
   - `app/config.py` - stores credentials (filled from `.env` and the form).
   - `app/process_state.py` - tracks status.
   - `app/getSsSheetID.py` - fetches sheet IDs in a Smartsheet folder.
-- `resource/` - generated downloads (sheets, comments, row mappings, attachments).
+- `/app/tempData/resource/` - temporary generated downloads (cleared per sheet after upload).
 - `backup/` - archived older scripts/configs.
 
 ## Tips if it fails

@@ -6,12 +6,23 @@ from flask import Flask, render_template, request, jsonify
 import logging
 from logging.handlers import RotatingFileHandler
 import threading
+import hmac
+from functools import wraps
 import main
 import process_state
 import config
 import os
 from werkzeug.utils import secure_filename
-from ssextractor import get_or_create_drive_folder
+from ssextractor import (
+    get_or_create_drive_folder,
+    validate_storage_health,
+    DEFAULT_ARCHIVE_DRIVE_ROOT_FOLDER_ID,
+)
+from archive_settings import (
+    get_archive_root_settings,
+    update_archive_root_settings,
+    parse_archive_root_ids,
+)
 
 app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = os.getcwd()
@@ -27,6 +38,42 @@ if not logger.handlers:
 
 def log(message):
     logger.info(message)
+
+
+def enforce_startup_health_check():
+    try:
+        validate_storage_health()
+    except RuntimeError as exc:
+        logger.critical("Startup health check failed: %s", exc)
+        raise SystemExit(f"Startup health check failed: {exc}") from exc
+
+
+def _is_admin_authorized(username, password):
+    expected_username = config.CREDENTIALS.get("ADMIN_USERNAME") or "admin"
+    expected_password = config.CREDENTIALS.get("ADMIN_PASSWORD") or "admin"
+    return (
+        hmac.compare_digest(username or "", expected_username)
+        and hmac.compare_digest(password or "", expected_password)
+    )
+
+
+def _admin_auth_response():
+    return (
+        "Admin credentials required",
+        401,
+        {"WWW-Authenticate": 'Basic realm="Smartsheet Admin"'},
+    )
+
+
+def require_admin_auth(route_handler):
+    @wraps(route_handler)
+    def wrapped(*args, **kwargs):
+        auth = request.authorization
+        if not auth or not _is_admin_authorized(auth.username, auth.password):
+            return _admin_auth_response()
+        return route_handler(*args, **kwargs)
+
+    return wrapped
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -111,6 +158,44 @@ def index():
         return render_template('migration_started.html', job_id=job_id)
     return render_template('index.html')
 
+
+@app.route('/admin', methods=['GET', 'POST'])
+@require_admin_auth
+def admin():
+    message = None
+    error_message = None
+    settings = get_archive_root_settings(DEFAULT_ARCHIVE_DRIVE_ROOT_FOLDER_ID)
+
+    if request.method == 'POST':
+        raw_folder_ids = request.form.get("archive_root_folder_ids")
+        active_root_id = (request.form.get("active_archive_root_folder_id") or "").strip()
+
+        parsed_folder_ids = parse_archive_root_ids(raw_folder_ids)
+        if not parsed_folder_ids:
+            parsed_folder_ids = settings.get("archive_root_folder_ids", [])
+        if not active_root_id:
+            active_root_id = settings.get("active_archive_root_folder_id")
+
+        try:
+            settings = update_archive_root_settings(
+                folder_ids=parsed_folder_ids,
+                active_root_id=active_root_id,
+                default_root_id=DEFAULT_ARCHIVE_DRIVE_ROOT_FOLDER_ID,
+            )
+            message = "Archive root settings updated. Running jobs continue uninterrupted."
+        except ValueError as exc:
+            error_message = str(exc)
+        except Exception as exc:
+            error_message = f"Failed to save archive root settings: {exc}"
+
+    return render_template(
+        "admin.html",
+        settings=settings,
+        default_root_id=DEFAULT_ARCHIVE_DRIVE_ROOT_FOLDER_ID,
+        message=message,
+        error_message=error_message,
+    )
+
 @app.route('/status', methods=['GET'])
 def status():
     job_id = request.args.get("job_id")
@@ -132,5 +217,6 @@ def cancel():
 
 if __name__ == '__main__':
     from waitress import serve
+    enforce_startup_health_check()
     log("Starting production server on port 5000...")
     serve(app, host='0.0.0.0', port=5000)

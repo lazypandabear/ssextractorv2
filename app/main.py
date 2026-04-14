@@ -12,8 +12,11 @@ from ssextractor import (
     upload_to_google_drive,
     upload_comments_to_drive,
     upload_attachments_to_drive,
+    upload_archive_copy_to_drive,
+    cleanup_sheet_temp_data,
     access_config_file,
-    get_smartsheet_client
+    get_smartsheet_client,
+    validate_storage_health,
 )
 from getSsSheetID import get_sheets_in_folder
 import config
@@ -42,6 +45,7 @@ def run_migration(job_id, job_credentials):
         #smartsheet_api_key = config.get("SMARTSHEET_FOLDER_ID")
         token = config.set_thread_credentials(job_credentials)
         job_token = process_state.set_current_job(job_id)
+        validate_storage_health()
         client = get_smartsheet_client()
 
         #client = smartsheet.Smartsheet()
@@ -68,45 +72,51 @@ def run_migration(job_id, job_credentials):
             sheet_id = sheet.id
             process_state.update_status(job_id, progress=f"Processing sheet {sheet_id}...")
             log(f"Processing sheet {sheet_id}.")
+            try:
+                download_smartsheet_as_excel(sheet_id)
+                if process_state.is_cancel_requested():
+                    break
 
-            download_smartsheet_as_excel(sheet_id)
-            if process_state.is_cancel_requested():
-                break
+                extract_and_store_comments(sheet_id)
+                if process_state.is_cancel_requested():
+                    break
 
-            extract_and_store_comments(sheet_id)
-            if process_state.is_cancel_requested():
-                break
+                create_relative_row_mapping(sheet_id)
+                if process_state.is_cancel_requested():
+                    break
 
-            create_relative_row_mapping(sheet_id)
-            if process_state.is_cancel_requested():
-                break
+                merge_comments_with_row_mapping(sheet_id)
+                if process_state.is_cancel_requested():
+                    break
 
-            merge_comments_with_row_mapping(sheet_id)
-            if process_state.is_cancel_requested():
-                break
+                download_smartsheet_attachments(sheet_id)
+                if process_state.is_cancel_requested():
+                    break
 
-            download_smartsheet_attachments(sheet_id)
-            if process_state.is_cancel_requested():
-                break
+                prepare_sheet_for_drive_upload(sheet_id)
+                if process_state.is_cancel_requested():
+                    break
 
-            prepare_sheet_for_drive_upload(sheet_id)
-            if process_state.is_cancel_requested():
-                break
+                upload_to_google_drive(sheet_id)
+                if process_state.is_cancel_requested():
+                    break
 
-            upload_to_google_drive(sheet_id)
-            if process_state.is_cancel_requested():
-                break
+                upload_comments_to_drive(sheet_id)
+                if process_state.is_cancel_requested():
+                    break
 
-            upload_comments_to_drive(sheet_id)
-            if process_state.is_cancel_requested():
-                break
+                upload_attachments_to_drive(sheet_id)
+                if process_state.is_cancel_requested():
+                    break
 
-            upload_attachments_to_drive(sheet_id)
-            if process_state.is_cancel_requested():
-                break
+                upload_archive_copy_to_drive(sheet_id)
+                if process_state.is_cancel_requested():
+                    break
 
-            # Optional: simulate delay between processing sheets
-            time.sleep(1)
+                # Optional: simulate delay between processing sheets
+                time.sleep(1)
+            finally:
+                cleanup_sheet_temp_data(sheet_id)
 
         if process_state.is_cancel_requested():
             process_state.update_status(job_id, running=False, progress="Migration Cancelled", finished=True)

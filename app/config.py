@@ -17,10 +17,14 @@ CREDENTIALS = {
     "GOOGLE_DRIVE_SHEETS_FOLDER_ID": os.getenv("GOOGLE_DRIVE_SHEETS_FOLDER_ID"),
     "GOOGLE_DRIVE__COMMENTS_FOLDER_ID": os.getenv("GOOGLE_DRIVE__COMMENTS_FOLDER_ID"),
     "GOOGLE_DRIVE_ATTACHMENTS_FOLDER_ID": os.getenv("GOOGLE_DRIVE_ATTACHMENTS_FOLDER_ID"),
+    "GOOGLE_DRIVE_ARCHIVE_ROOT_FOLDER_ID": os.getenv("GOOGLE_DRIVE_ARCHIVE_ROOT_FOLDER_ID"),
+    "ARCHIVE_ROOT_SETTINGS_FILE": os.getenv("ARCHIVE_ROOT_SETTINGS_FILE", "archive_root_settings.json"),
     "APPSHEET_API_KEY": os.getenv("APPSHEET_API_KEY"),
     "APPSHEET_APP_ID": os.getenv("APPSHEET_APP_ID"),
     "APPSHEET_TABLE_NAME": os.getenv("APPSHEET_TABLE_NAME"),
     "SMARTSHEET_BASE_DIR": os.getenv("SMARTSHEET_BASE_DIR"),
+    "ADMIN_USERNAME": os.getenv("ADMIN_USERNAME", "admin"),
+    "ADMIN_PASSWORD": os.getenv("ADMIN_PASSWORD", "admin"),
     # Google auth configuration
     # GOOGLE_AUTH_TYPE: "service_account" (default) or "oauth"
     "GOOGLE_AUTH_TYPE": os.getenv("GOOGLE_AUTH_TYPE", "service_account"),
